@@ -1,0 +1,271 @@
+package com.example.tallycounter
+
+import android.content.pm.ActivityInfo
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+
+// ---------- Colors ----------
+private val GreenMain = Color(0xFF2E7D32)
+private val RedMain = Color(0xFFC62828)
+private val GreenAccent = Color(0xFF66BB6A)
+private val RedAccent = Color(0xFFEF5350)
+private val BarBackground = Color(0xFF263238)
+private val NeutralAccent = Color(0xFFB0BEC5)
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Fixed landscape (both landscape directions allowed).
+        // Also add android:screenOrientation="sensorLandscape" in the manifest for a
+        // flicker-free launch.
+        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+
+        // Immersive full-screen so the 85/15 split uses the whole display.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+
+        setContent {
+            MaterialTheme {
+                TallyCounterApp()
+            }
+        }
+    }
+}
+
+// ---------- Root screen ----------
+@Composable
+fun TallyCounterApp() {
+    // rememberSaveable keeps values across rotation / process death.
+    var greenCount by rememberSaveable { mutableIntStateOf(0) }
+    var redCount by rememberSaveable { mutableIntStateOf(0) }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+
+        // ===== Top 85%: primary tally buttons =====
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(0.85f)
+        ) {
+            CounterPanel(
+                count = greenCount,
+                color = GreenMain,
+                description = "Green counter",
+                onClick = { greenCount++ },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+            )
+            CounterPanel(
+                count = redCount,
+                color = RedMain,
+                description = "Red counter",
+                onClick = { redCount++ },
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+            )
+        }
+
+        // ===== Bottom 15%: control bar =====
+        ControlBar(
+            onResetRed = { redCount = 0 },
+            onDecrementRed = { if (redCount > 0) redCount-- },
+            onDecrementGreen = { if (greenCount > 0) greenCount-- },
+            onResetGreen = { greenCount = 0 },
+            onResetAll = {
+                redCount = 0
+                greenCount = 0
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(0.15f)
+        )
+    }
+}
+
+// ---------- Big tap area ----------
+@Composable
+fun CounterPanel(
+    count: Int,
+    color: Color,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Shrink the font a little as the number grows so it always fits.
+    val fontSize = when {
+        count < 100 -> 140.sp
+        count < 1_000 -> 110.sp
+        count < 10_000 -> 84.sp
+        else -> 64.sp
+    }
+
+    Box(
+        modifier = modifier
+            .background(color)
+            .clickable(onClick = onClick, role = Role.Button) // default ripple feedback
+            .semantics { contentDescription = "$description: $count. Tap to add one." },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = count.toString(),
+            color = Color.White,
+            fontSize = fontSize,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
+    }
+}
+
+// ---------- Bottom control bar ----------
+@Composable
+fun ControlBar(
+    onResetRed: () -> Unit,
+    onDecrementRed: () -> Unit,
+    onDecrementGreen: () -> Unit,
+    onResetGreen: () -> Unit,
+    onResetAll: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .background(BarBackground)
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Red controls (bottom-left)
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ControlButton(
+                label = "R",
+                accent = RedAccent,
+                description = "Reset red counter",
+                onClick = onResetRed,
+                modifier = Modifier.weight(1f)
+            )
+            ControlButton(
+                label = "−",
+                accent = RedAccent,
+                description = "Decrease red counter",
+                onClick = onDecrementRed,
+                modifier = Modifier.weight(1f)
+            )
+            // Placeholder slot that mirrors the outline of the "Reset All" slot
+            Spacer(modifier = Modifier.weight(1f))
+        }
+
+        Spacer(modifier = Modifier.padding(horizontal = 6.dp))
+
+        // Green controls (bottom-right)
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ControlButton(
+                label = "−",
+                accent = GreenAccent,
+                description = "Decrease green counter",
+                onClick = onDecrementGreen,
+                modifier = Modifier.weight(1f)
+            )
+            ControlButton(
+                label = "R",
+                accent = GreenAccent,
+                description = "Reset green counter",
+                onClick = onResetGreen,
+                modifier = Modifier.weight(1f)
+            )
+            ControlButton(
+                label = "Reset All",
+                accent = NeutralAccent,
+                description = "Reset both counters",
+                onClick = onResetAll,
+                modifier = Modifier.weight(1f),
+                fontSize = 13
+            )
+        }
+    }
+}
+
+// ---------- Rounded / oval outlined control button ----------
+@Composable
+fun ControlButton(
+    label: String,
+    accent: Color,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    fontSize: Int = 20
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier
+            .padding(horizontal = 4.dp)
+            .fillMaxHeight(0.78f)
+            .semantics { contentDescription = description },
+        shape = RoundedCornerShape(50), // pill / oval
+        border = BorderStroke(2.dp, accent),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = accent.copy(alpha = 0.22f),
+            contentColor = Color.White
+        ),
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+    ) {
+        Text(
+            text = label,
+            color = Color.White,
+            fontSize = fontSize.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
+        )
+    }
+}
